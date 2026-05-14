@@ -40,11 +40,11 @@ function App() {
   const [password, setPassword] = useState('');
 
   useEffect(() => {
-    if (token) {
+    if (token && user) {
       fetchTasks();
       if (user.role === 'admin') fetchUsers();
     }
-  }, [token]);
+  }, [token, user?.id]);
 
   const fetchTasks = async () => {
     const res = await fetch(`${API_URL}/tasks`, {
@@ -56,39 +56,38 @@ function App() {
 
   const fetchUsers = async () => {
     const res = await fetch(`${API_URL}/users`, {
-      useEffect(() => {
-        if (token && user) {
-          fetchTasks();
-          if (user.role === 'admin') fetchUsers();
-        }
-      }, [token, user?.id]);
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    setUsers(data);
+  };
 
-      const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-          const res = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-          });
-          const data = await res.json();
-          if (data.token) {
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            setToken(data.token);
-            setUser(data.user);
-            // Reset filters on login
-            setFilterUser('');
-            setFilterStatus('');
-          } else {
-            alert(data.error);
-          }
-        } catch (err) {
-          alert('Erro ao conectar com servidor');
-        }
-        setLoading(false);
-      };
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setToken(data.token);
+        setUser(data.user);
+        setFilterUser('');
+        setFilterStatus('');
+      } else {
+        alert(data.error);
+      }
+    } catch (err) {
+      alert('Erro ao conectar com servidor');
+    }
+    setLoading(false);
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     setToken(null);
