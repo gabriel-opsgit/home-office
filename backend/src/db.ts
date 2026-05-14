@@ -1,14 +1,13 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import Database from 'better-sqlite3';
 import bcrypt from 'bcrypt';
 
-export async function initDb() {
-  const db = await open({
-    filename: './database.sqlite',
-    driver: sqlite3.Database
-  });
+let db: any;
 
-  await db.exec(`
+export function initDb() {
+  db = new Database('./database.sqlite');
+  db.pragma('journal_mode = WAL');
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -43,20 +42,20 @@ export async function initDb() {
   `);
 
   // Migration: Ensure all columns exist
-  const tableInfo = await db.all("PRAGMA table_info(tasks)");
-  const columns = tableInfo.map(col => col.name);
+  const tableInfo = db.prepare("PRAGMA table_info(tasks)").all();
+  const columns = (tableInfo as any[]).map(col => col.name);
   
   if (!columns.includes('client_name')) {
-    await db.exec('ALTER TABLE tasks ADD COLUMN client_name TEXT');
+    db.exec('ALTER TABLE tasks ADD COLUMN client_name TEXT');
   }
   if (!columns.includes('due_date')) {
-    await db.exec('ALTER TABLE tasks ADD COLUMN due_date TEXT');
+    db.exec('ALTER TABLE tasks ADD COLUMN due_date TEXT');
   }
   if (!columns.includes('priority')) {
-    await db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'normal'");
+    db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'normal'");
   }
   if (!columns.includes('completed_at')) {
-    await db.exec("ALTER TABLE tasks ADD COLUMN completed_at DATETIME");
+    db.exec("ALTER TABLE tasks ADD COLUMN completed_at DATETIME");
   }
 
   // Seed Users
@@ -70,13 +69,15 @@ export async function initDb() {
   ];
 
   for (const user of users) {
-    const existing = await db.get('SELECT * FROM users WHERE username = ?', user.username);
+    const existing = db.prepare('SELECT * FROM users WHERE username = ?').get(user.username);
     if (!existing) {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
-      await db.run('INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)', 
+      const hashedPassword = bcrypt.hashSync(user.password, 10);
+      db.prepare('INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)').run(
         user.name, user.username, hashedPassword, user.role);
     }
   }
 
   return db;
 }
+
+export { db };

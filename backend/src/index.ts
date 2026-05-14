@@ -16,7 +16,7 @@ app.use(express.json());
 const frontendPath = path.join(__dirname, '../../frontend/dist');
 app.use(express.static(frontendPath));
 
-let db: any;
+const db = initDb();
 
 // Auth Middleware
 const authenticate = (req: any, res: any, next: any) => {
@@ -31,10 +31,10 @@ const authenticate = (req: any, res: any, next: any) => {
 };
 
 // Login
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  const user = await db.get('SELECT * FROM users WHERE username = ?', username);
-  if (user && await bcrypt.compare(password, user.password)) {
+  const user: any = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (user && bcrypt.compareSync(password, user.password)) {
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role, name: user.name }, JWT_SECRET);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, name: user.name } });
   } else {
@@ -43,39 +43,39 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Users list (for Admin to assign)
-app.get('/api/users', authenticate, async (req: any, res) => {
+app.get('/api/users', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-  const users = await db.all('SELECT id, name FROM users WHERE role = "user"');
+  const users = db.prepare('SELECT id, name FROM users WHERE role = "user"').all();
   res.json(users);
 });
 
 // Tasks
-app.get('/api/tasks', authenticate, async (req: any, res) => {
+app.get('/api/tasks', authenticate, (req: any, res) => {
   let tasks;
   if (req.user.role === 'admin') {
-    tasks = await db.all(`
+    tasks = db.prepare(`
       SELECT tasks.*, users.name as assigned_name 
       FROM tasks 
       LEFT JOIN users ON tasks.assigned_to = users.id
       ORDER BY created_at DESC
-    `);
+    `).all();
   } else {
-    tasks = await db.all('SELECT * FROM tasks WHERE assigned_to = ? ORDER BY created_at DESC', req.user.id);
+    tasks = db.prepare('SELECT * FROM tasks WHERE assigned_to = ? ORDER BY created_at DESC').all(req.user.id);
   }
   res.json(tasks);
 });
 
-app.post('/api/tasks', authenticate, async (req: any, res) => {
+app.post('/api/tasks', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   const { title, description, client_name, due_date, priority, assigned_to } = req.body;
-  const result = await db.run('INSERT INTO tasks (title, description, client_name, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?)', 
+  const result = db.prepare('INSERT INTO tasks (title, description, client_name, due_date, priority, assigned_to) VALUES (?, ?, ?, ?, ?, ?)').run(
     title, description, client_name, due_date, priority, assigned_to);
-  res.json({ id: result.lastID });
+  res.json({ id: result.lastInsertRowid });
 });
 
-app.patch('/api/tasks/:id', authenticate, async (req: any, res) => {
+app.patch('/api/tasks/:id', authenticate, (req: any, res) => {
   const { title, description, client_name, due_date, priority, assigned_to, status } = req.body;
-  const task = await db.get('SELECT * FROM tasks WHERE id = ?', req.params.id);
+  const task: any = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   
   if (req.user.role !== 'admin' && task.assigned_to !== req.user.id) {
@@ -90,8 +90,9 @@ app.patch('/api/tasks/:id', authenticate, async (req: any, res) => {
   }
 
   if (req.user.role === 'admin') {
-    await db.run(
-      'UPDATE tasks SET title = ?, description = ?, client_name = ?, due_date = ?, priority = ?, assigned_to = ?, status = ?, completed_at = ? WHERE id = ?',
+    db.prepare(`
+      UPDATE tasks SET title = ?, description = ?, client_name = ?, due_date = ?, priority = ?, assigned_to = ?, status = ?, completed_at = ? WHERE id = ?
+    `).run(
       title ?? task.title,
       description ?? task.description,
       client_name ?? task.client_name,
@@ -103,8 +104,7 @@ app.patch('/api/tasks/:id', authenticate, async (req: any, res) => {
       req.params.id
     );
   } else {
-    // Regular users can only update status (and indirectly completed_at)
-    await db.run('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?', 
+    db.prepare('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?').run(
       status ?? task.status, completedAt, req.params.id);
   }
   
@@ -112,42 +112,42 @@ app.patch('/api/tasks/:id', authenticate, async (req: any, res) => {
 });
 
 // Comments
-app.get('/api/tasks/:id/comments', authenticate, async (req: any, res) => {
-  const comments = await db.all(`
+app.get('/api/tasks/:id/comments', authenticate, (req: any, res) => {
+  const comments = db.prepare(`
     SELECT comments.*, users.name as user_name 
     FROM comments 
     JOIN users ON comments.user_id = users.id 
     WHERE task_id = ? 
     ORDER BY created_at ASC
-  `, req.params.id);
+  `).all(req.params.id);
   res.json(comments);
 });
 
-app.post('/api/tasks/:id/comments', authenticate, async (req: any, res) => {
+app.post('/api/tasks/:id/comments', authenticate, (req: any, res) => {
   const { content } = req.body;
-  await db.run('INSERT INTO comments (task_id, user_id, content) VALUES (?, ?, ?)', 
+  db.prepare('INSERT INTO comments (task_id, user_id, content) VALUES (?, ?, ?)').run(
     req.params.id, req.user.id, content);
   res.json({ success: true });
 });
 
 // Delete Task (Admin only)
-app.delete('/api/tasks/:id', authenticate, async (req: any, res) => {
+app.delete('/api/tasks/:id', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-  await db.run('DELETE FROM comments WHERE task_id = ?', req.params.id);
-  await db.run('DELETE FROM tasks WHERE id = ?', req.params.id);
+  db.prepare('DELETE FROM comments WHERE task_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // Delete Comment (Admin or comment author)
-app.delete('/api/comments/:id', authenticate, async (req: any, res) => {
-  const comment = await db.get('SELECT * FROM comments WHERE id = ?', req.params.id);
+app.delete('/api/comments/:id', authenticate, (req: any, res) => {
+  const comment: any = db.prepare('SELECT * FROM comments WHERE id = ?').get(req.params.id);
   if (!comment) return res.status(404).json({ error: 'Comment not found' });
 
   if (req.user.role !== 'admin' && comment.user_id !== req.user.id) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  await db.run('DELETE FROM comments WHERE id = ?', req.params.id);
+  db.prepare('DELETE FROM comments WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
@@ -156,7 +156,4 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-initDb().then(database => {
-  db = database;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
