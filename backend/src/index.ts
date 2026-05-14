@@ -40,10 +40,12 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// Users list
+// Users list (for Admin to assign)
 app.get('/api/users', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  // Get all users except current admin to avoid assigning tasks to yourself by mistake
   const users = db.prepare('SELECT id, name FROM users WHERE role = "user"').all();
+  console.log('Fetching users for admin:', users);
   res.json(users);
 });
 

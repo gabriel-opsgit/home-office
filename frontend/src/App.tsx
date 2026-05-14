@@ -55,11 +55,16 @@ function App() {
   };
 
   const fetchUsers = async () => {
-    const res = await fetch(`${API_URL}/users`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await res.json();
-    setUsers(data);
+    try {
+      const res = await fetch(`${API_URL}/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      console.log('Users loaded:', data);
+      setUsers(data);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
