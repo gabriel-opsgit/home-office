@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LogOut, CheckCircle, Circle, MessageSquare, Plus, Trash2, User, Edit2, Save, X, Briefcase, Calendar, Filter, AlertCircle, EyeOff, Eye, Search } from 'lucide-react';
 import './styles/main.css';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = '/api';
 
 function App() {
   const [user, setUser] = useState<any>(JSON.parse(localStorage.getItem('user') || 'null'));

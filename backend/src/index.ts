@@ -2,14 +2,19 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import path from 'path';
 import { initDb } from './db';
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const JWT_SECRET = 'taskhub_secret_key_123';
 
 app.use(cors());
 app.use(express.json());
+
+// Serve Static Files from Frontend
+const frontendPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendPath));
 
 let db: any;
 
@@ -146,7 +151,12 @@ app.delete('/api/comments/:id', authenticate, async (req: any, res) => {
   res.json({ success: true });
 });
 
+// SPA Routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
 initDb().then(database => {
   db = database;
-  app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 });
