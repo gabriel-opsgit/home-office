@@ -12,10 +12,6 @@ const JWT_SECRET = 'taskhub_secret_key_123';
 app.use(cors());
 app.use(express.json());
 
-// Serve Static Files from Frontend
-const frontendPath = path.join(__dirname, '../../frontend/dist');
-app.use(express.static(frontendPath));
-
 const db = initDb();
 
 // Auth Middleware
@@ -30,6 +26,8 @@ const authenticate = (req: any, res: any, next: any) => {
   }
 };
 
+// --- API ROUTES ---
+
 // Login
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
@@ -42,7 +40,7 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// Users list (for Admin to assign)
+// Users list
 app.get('/api/users', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   const users = db.prepare('SELECT id, name FROM users WHERE role = "user"').all();
@@ -130,7 +128,7 @@ app.post('/api/tasks/:id/comments', authenticate, (req: any, res) => {
   res.json({ success: true });
 });
 
-// Delete Task (Admin only)
+// Delete Task
 app.delete('/api/tasks/:id', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   db.prepare('DELETE FROM comments WHERE task_id = ?').run(req.params.id);
@@ -138,21 +136,22 @@ app.delete('/api/tasks/:id', authenticate, (req: any, res) => {
   res.json({ success: true });
 });
 
-// Delete Comment (Admin or comment author)
+// Delete Comment
 app.delete('/api/comments/:id', authenticate, (req: any, res) => {
   const comment: any = db.prepare('SELECT * FROM comments WHERE id = ?').get(req.params.id);
   if (!comment) return res.status(404).json({ error: 'Comment not found' });
-
-  if (req.user.role !== 'admin' && comment.user_id !== req.user.id) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
+  if (req.user.role !== 'admin' && comment.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
   db.prepare('DELETE FROM comments WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
-// SPA Routing
-app.get('/:path*', (req, res) => {
+// --- FRONTEND SERVING ---
+
+const frontendPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Final catch-all for SPA - No problematic wildcards here!
+app.use((req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
