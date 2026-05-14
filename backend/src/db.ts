@@ -45,21 +45,13 @@ export function initDb() {
   const tableInfo = db.prepare("PRAGMA table_info(tasks)").all();
   const columns = (tableInfo as any[]).map(col => col.name);
   
-  if (!columns.includes('client_name')) {
-    db.exec('ALTER TABLE tasks ADD COLUMN client_name TEXT');
-  }
-  if (!columns.includes('due_date')) {
-    db.exec('ALTER TABLE tasks ADD COLUMN due_date TEXT');
-  }
-  if (!columns.includes('priority')) {
-    db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'normal'");
-  }
-  if (!columns.includes('completed_at')) {
-    db.exec("ALTER TABLE tasks ADD COLUMN completed_at DATETIME");
-  }
+  if (!columns.includes('client_name')) db.exec('ALTER TABLE tasks ADD COLUMN client_name TEXT');
+  if (!columns.includes('due_date')) db.exec('ALTER TABLE tasks ADD COLUMN due_date TEXT');
+  if (!columns.includes('priority')) db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'normal'");
+  if (!columns.includes('completed_at')) db.exec("ALTER TABLE tasks ADD COLUMN completed_at DATETIME");
 
-  // Seed Users
-  const users = [
+  // SEED USERS - HARCODED AND GUARANTEED
+  const team = [
     { name: 'Admin', username: 'admin', password: 'admin123', role: 'admin' },
     { name: 'Rafaela', username: 'rafaela', password: '123', role: 'user' },
     { name: 'Gabriel', username: 'gabriel', password: '123', role: 'user' },
@@ -68,16 +60,13 @@ export function initDb() {
     { name: 'Bruno', username: 'bruno', password: '123', role: 'user' },
   ];
 
-  for (const user of users) {
-    const existing = db.prepare('SELECT * FROM users WHERE username = ?').get(user.username);
-    if (!existing) {
-      const hashedPassword = bcrypt.hashSync(user.password, 10);
-      db.prepare('INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)').run(
-        user.name, user.username, hashedPassword, user.role);
+  for (const u of team) {
+    const exists = db.prepare('SELECT * FROM users WHERE username = ?').get(u.username);
+    if (!exists) {
+      const hash = bcrypt.hashSync(u.password, 10);
+      db.prepare('INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)').run(u.name, u.username, hash, u.role);
     }
   }
 
   return db;
 }
-
-export { db };
