@@ -8,7 +8,13 @@ function App() {
   const [user, setUser] = useState<any>(JSON.parse(localStorage.getItem('user') || 'null'));
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [tasks, setTasks] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([
+    { id: 2, name: 'Rafaela' },
+    { id: 3, name: 'Gabriel' },
+    { id: 4, name: 'Caio' },
+    { id: 5, name: 'Henrique' },
+    { id: 6, name: 'Bruno' }
+  ]);
   const [loading, setLoading] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
