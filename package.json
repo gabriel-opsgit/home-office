@@ -5,7 +5,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "build": "cd backend && npm install && npx tsc && cd ../frontend && npm install && npm run build",
+    "build": "cd backend && npm install && rm -rf dist && npx tsc && cd ../frontend && npm install && npm run build",
     "start": "cd backend && node dist/index.js"
   }
 }

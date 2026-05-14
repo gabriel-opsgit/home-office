@@ -152,7 +152,7 @@ app.delete('/api/comments/:id', authenticate, (req: any, res) => {
 });
 
 // SPA Routing
-app.get('(.*)', (req, res) => {
+app.get('/:path*', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
